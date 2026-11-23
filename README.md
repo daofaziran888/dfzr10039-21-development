@@ -73,6 +73,32 @@ npm run dev
 | 导出任务 | `export_task` | 导出记录 | 记录编号、数据来源、导出格式 |
 | 操作审计 | `audit_log` | 审计记录 | 记录编号、操作模块、操作人 |
 
+## 报价差异复核
+
+在通用模块之外，`quality_sample` 之上还有一条报价批次复核链路，用于把「字段差异 →
+复核单 → 按单取样 → 质检台账」串起来：
+
+| 能力 | 接口 | 说明 |
+| --- | --- | --- |
+| 批次发布 | `POST /api/qc/batches` | 发布一个报价批次版本，相对父版本自动生成字段级差异 |
+| 按字段查差异 | `GET /api/qc/diffs?field=金额&page=1&size=20` | 返回字段名、前值、后值、基线/来源版本，可分页 |
+| 开复核单 | `POST /api/qc/review-tickets` | 传 `diff_ids` 或按 `field`/`quote_id` 整批开单；同处差异只保留一份有效单据，支持 `idempotency_key` |
+| 回查原单 | `GET /api/qc/review-tickets/{id}` | 原单快照（前值/后值/来源版本）与当前版本实时值分开返回 |
+| 按原单取样 | `POST /api/qc/review-tickets/{id}/sample` | 从复核单快照的来源版本取值；已确认样本锁定，不换成其他版本 |
+| 当前复验 | `POST /api/qc/reverify` | 按 `baseline_version` 对当前版本重新判差异，名额优先给仍有差异的复核单；未入样写明更正依据 |
+| 质检台账 | `GET /api/qc/ledger` | 样本结果回写，旧样本标明发布版本 |
+
+前端入口：左侧导航「报价差异复核」（`/quote-review`）。
+
+本地演练（后端已启动）：
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/qc/demo/bootstrap      # V0 基线 + V1 上午批
+curl -X POST http://127.0.0.1:8000/api/qc/demo/correction     # 更正批 V2：A 金额改回 8
+```
+
+演示数据约定：V1 中 A 金额 8→9、D 金额 5→7、B 只改标题；V2 只把 A 改回 8。
+
 ## 约定
 
 - 全部模块共享`frontend/src/views/WorkbenchView.vue|tsx`和一套资源路由。
